@@ -98,6 +98,11 @@ struct thread
 
     struct list_elem wait_elem;
 
+    /* Donee and Donor's list for priority inheritance */
+    tid_t donee;
+    struct list donors_list;
+    struct list_elem donor_elem;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -142,5 +147,12 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+bool thread_higher_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_lower_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+
+void thread_donate_priority(struct thread *t);
+void thread_release_priority(void);
+
 
 #endif /* threads/thread.h */
