@@ -189,7 +189,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   if(list_entry(list_begin(&wait_list), struct thread, wait_elem)->wake_time < ticks)
   {
     struct thread *t = list_entry(list_pop_front(&wait_list), struct thread, wait_elem);
-    printf("thread %s woke up at : %i\n", t->name, ticks);
+    //printf("thread %s woke up at : %i\n", t->name, ticks);
     sema_up(&t->a);
   }
   thread_tick ();

@@ -24,9 +24,7 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
-/* List of processes waiting to run */
 struct list wait_list;
-
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -42,6 +40,7 @@ timer_init (void)
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
   list_init(&wait_list);
+  //printf("wait_list init");
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +88,6 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-
-
-
-
-
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
@@ -102,29 +96,20 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-
-  struct thread *cur = thread_current ();
-  cur->wait_time = start + ticks;
-
+  struct thread *t = thread_current();
+  t->wake_time = start + ticks;
+  
+  //printf("putting to sleep %s\n", t->name);
+  //printf("list size before insertion %i\n", list_size(&wait_list));
   intr_disable();
-
-  list_insert_ordered(&wait_list, &cur->wait_elem, less_time_func, NULL);
-
+  list_insert_ordered(&wait_list, &t->wait_elem, less, NULL);
   intr_enable();
-
-  sema_down(&cur->a);
-
-
-
+  //printf("list size after insertion %i\n", list_size(&wait_list));
+  sema_down(&t->a);
+  
   //while (timer_elapsed (start) < ticks) 
   //  thread_yield ();
 }
-
-
-
-
-
-
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
@@ -196,29 +181,19 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-
-
-
-
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  if(list_entry(list_begin(&wait_list), struct thread, wait_elem)->wait_time < ticks){
-    
+  if(list_entry(list_begin(&wait_list), struct thread, wait_elem)->wake_time < ticks)
+  {
     struct thread *t = list_entry(list_pop_front(&wait_list), struct thread, wait_elem);
     printf("thread %s woke up at : %i\n", t->name, ticks);
     sema_up(&t->a);
   }
-
   thread_tick ();
 }
-
-
-
-
-
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
@@ -291,12 +266,12 @@ real_time_delay (int64_t num, int32_t denom)
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
 
-bool less_time_func(const struct list_elem *a_,
-                             const struct list_elem *b_,
-                             void *aux UNUSED)
+bool less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-  const struct thread *a = list_entry (a_, struct thread, wait_elem);
-  const struct thread *b = list_entry (b_, struct thread, wait_elem);
+  const struct thread *a_ = list_entry(a, struct thread, wait_elem);
+  const struct thread *b_ = list_entry(b, struct thread, wait_elem);
+  //printf("a wake up time: %i \n", a_->wake_time);
+  //printf("b wake up time: %i \n", b_->wake_time);
 
-  return a->wait_time < b->wait_time;
+  return a_->wake_time < b_->wake_time;
 }

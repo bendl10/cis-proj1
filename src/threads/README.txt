@@ -1,20 +1,5 @@
-Project 0 changes
-Ben Leuthold
-09-05-14
+Added {"alarm-mega", test_alarm_mega}, to the the tests array inside the tests.c file found in the directory /pintos/src/tests/threads/
 
-tests/threads/alarm-wait.c
-	added lines 27-31
+Added the function test_alarm_mega to the alarm-wait.c file inside the /pintos/src/tests/threads/ directory
 
-tests/threads/Make.tests
-	edited line 5
-
-tests/threads/tests.c
-	added line 16
-
-tests/threads/tests.h
-	added line 10
-
-tests/threads/Rubric.alarm
-	added line 4
-
-
+Added an extern ref to test_alarm_mega inside tests.h
