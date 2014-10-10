@@ -99,7 +99,7 @@ struct thread
     struct list_elem wait_elem;
 
     /* Donee and Donor's list for priority inheritance */
-    struct thread donee;
+    
     struct list donors_list;
     struct list_elem donor_elem;
 
@@ -143,6 +143,8 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+int thread_get_donated_priority (struct thread *t);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
@@ -152,7 +154,8 @@ bool thread_higher_priority(const struct list_elem *a, const struct list_elem *b
 bool thread_lower_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 void thread_donate_priority(struct thread *t);
-void thread_release_priority(void);
+void thread_release_priority(struct semaphore *sema);
 
+bool thread_higher_donation (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 #endif /* threads/thread.h */

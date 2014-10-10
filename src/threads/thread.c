@@ -255,7 +255,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   //list_push_back (&ready_list, &t->elem);
-  list_push_back (&(ready_list[t->priority]), &t->elem);
+  list_push_back (&(ready_list[thread_get_donated_priority(t)]), &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -326,7 +326,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back(&(ready_list[cur->priority]), &cur->elem);
+    list_push_back(&(ready_list[thread_get_priority()]), &cur->elem);
     //list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
@@ -363,11 +363,29 @@ int
 thread_get_priority (void) 
 {
   struct thread *cur = thread_current();
+  int donated_priority = PRI_MIN;
 
   if(!list_empty(&cur->donors_list))
-    return list_entry(list_front(&cur->donors_list), struct thread, donor_elem)->priority;
+  {
+    donated_priority = thread_get_donated_priority(list_entry(list_front(&cur->donors_list), struct thread, donor_elem));
+    return donated_priority > cur->priority ? donated_priority : cur->priority;
+  }
   else
     return cur->priority;
+}
+
+int
+thread_get_donated_priority (struct thread *t) 
+{
+  int donated_priority = PRI_MIN;
+
+  if(!list_empty(&t->donors_list))
+  {
+    donated_priority = thread_get_donated_priority(list_entry(list_front(&t->donors_list), struct thread, donor_elem));
+    return donated_priority > t->priority ? donated_priority : t->priority;
+  }
+  else
+    return t->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -491,7 +509,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->a, 0);
 
   list_init(&t->donors_list);
-  //&t->donee = NULL;
+  list_init(&t->donee_list);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -619,43 +637,54 @@ allocate_tid (void)
 
 bool thread_higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-  const struct thread *a_ = list_entry(a, struct thread, elem);
-  const struct thread *b_ = list_entry(b, struct thread, elem);
+  struct thread *a_ = list_entry(a, struct thread, elem);
+  struct thread *b_ = list_entry(b, struct thread, elem);
 
-  return a_->priority > b_->priority;
+  return thread_get_donated_priority(a_) > thread_get_donated_priority(b_);
 }
 
 
 bool thread_lower_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-  const struct thread *a_ = list_entry(a, struct thread, elem);
-  const struct thread *b_ = list_entry(b, struct thread, elem);
+  struct thread *a_ = list_entry(a, struct thread, elem);
+  struct thread *b_ = list_entry(b, struct thread, elem);
 
-  return a_->priority < b_->priority;
+  return thread_get_donated_priority(a_) < thread_get_donated_priority(b_);
 }
 
 void thread_donate_priority(struct thread *t)
 {
   struct thread *cur = thread_current();
 
-  list_insert_ordered(&t->donors_list, &cur->donor_elem, thread_higher_priority, NULL);
+  list_insert_ordered(&t->donors_list, &cur->donor_elem, thread_higher_donation, NULL);
   
-  //&cur->donee = &t->tid;
+  //list_push_front(&cur->donee_list, &t->donee_elem);
+
+  //if(!list_empty(&t->donee_list))
+  //  thread_donate_priority(list_entry(list_front(&t->donee_list), struct thread, donee_elem));
 }
 
-void thread_release_priority(void)
+void thread_release_priority(struct semaphore *sema)
 {
   struct thread *cur = thread_current();
   struct list_elem *elem = list_begin(&cur->donors_list);
   struct thread *donor;
+  //struct thread *donor;
   
-  while(elem != list_end(&cur->donors_list))
+  for(elem = list_begin(&sema->waiters); elem != list_tail(&sema->waiters); elem = list_next(elem))
   {
-    elem = list_front(&cur->donors_list);
-    donor = list_entry(elem, struct thread, donor_elem);
-    //&donor->donee = NULL;
-    elem = list_remove(elem);
+    donor = list_entry(elem, struct thread, elem);
+    list_remove(&donor->donor_elem);
+    //list_pop_front(&donor->donee_list);
   }
+}
+
+bool thread_higher_donation (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *a_ = list_entry(a, struct thread, donor_elem);
+  struct thread *b_ = list_entry(b, struct thread, donor_elem);
+
+  return thread_get_donated_priority(a_) > thread_get_donated_priority(b_);
 }
 
 /* Offset of `stack' member within `struct thread'.
