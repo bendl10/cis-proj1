@@ -52,13 +52,14 @@ wait list, we run sema_down on the thread's semaphore to put it to sleep.
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+Elements in the wait list are already sorted, so popping the top element is a simple and fast task for the interrupt to complete.
 
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
-
+Disabling and then enabling interrupts allows us to prevent race conditions from occurring.
 
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
